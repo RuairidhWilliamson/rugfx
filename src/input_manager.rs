@@ -109,7 +109,7 @@ impl<B: InputBind> InputManager<B> {
     /// Get the 1D axis
     pub fn axis(&self, bind: AxisBind<B>) -> f32 {
         (if self.held(bind.pos) { 1.0 } else { 0.0 })
-            + (if self.held(bind.neg) { 1.0 } else { 0.0 })
+            - (if self.held(bind.neg) { 1.0 } else { 0.0 })
     }
 
     /// Get the 2D axis

@@ -7,4 +7,4 @@ edition = "2021"
 unstable = []
 
 [dependencies]
-winit = { version = "0.28", default-features = false }
+winit = "0.28"

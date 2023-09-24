@@ -71,7 +71,7 @@ pub struct AxisBind<'a, B: InputBind> {
 ///
 /// # Example
 /// ```
-/// use ru_input_manager::{Bindings, dry_binds};
+/// use ru_input_helper::{Bindings, dry_binds};
 ///
 /// #[derive(PartialEq, Eq, Hash)]
 /// enum Binds {

@@ -606,7 +606,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ru-input-manager"
+name = "ru-input-helper"
 version = "0.0.0"
 dependencies = [
  "winit",
