@@ -13,7 +13,7 @@ use crate::{
 #[derive(Debug)]
 pub struct InputManager<B: InputBind> {
     /// The mouse sensitivity in the x and y direction. Use a negative value to reverse the mouse.
-    pub mouse_sensitivity: (f64, f64),
+    pub mouse_sensitivity: [f64; 2],
     /// Input bindings
     pub bindings: Bindings<B>,
     /// The current time elapsed since the start of the event loop scaled by the time_scale.
@@ -31,7 +31,7 @@ pub struct InputManager<B: InputBind> {
 impl<B: InputBind> Default for InputManager<B> {
     fn default() -> Self {
         Self {
-            mouse_sensitivity: (1.0, 1.0),
+            mouse_sensitivity: [1.0, 1.0],
             bindings: Bindings::default(),
             time: Duration::default(),
             time_scale: 1.0,
@@ -82,8 +82,8 @@ impl<B: InputBind> InputManager<B> {
     pub fn mouse_motion(&self) -> (f64, f64) {
         let m = self.raw.mouse_motion();
         (
-            m.0 * self.mouse_sensitivity.0,
-            m.1 * self.mouse_sensitivity.1,
+            m[0] * self.mouse_sensitivity[0],
+            m[1] * self.mouse_sensitivity[1],
         )
     }
 

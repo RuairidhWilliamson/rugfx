@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use crate::key::Key;
+use crate::inputs::Input;
 
 /// A trait alias for what your [`InputBind`] must implement.
 ///
@@ -23,7 +23,7 @@ impl<B> InputBind for B where B: PartialEq + Eq + Hash {}
 /// A map of keys to their bindings.
 #[derive(Debug)]
 pub struct Bindings<B: InputBind> {
-    key_map: HashMap<B, Vec<Key>>,
+    key_map: HashMap<B, Vec<Input>>,
 }
 
 impl<B: InputBind> Default for Bindings<B> {
@@ -36,7 +36,7 @@ impl<B: InputBind> Default for Bindings<B> {
 
 impl<B: InputBind> Bindings<B> {
     /// Bind a key to a binding
-    pub fn bind(&mut self, key: Key, input: B) {
+    pub fn bind(&mut self, key: Input, input: B) {
         let key_list = self.key_map.entry(input).or_default();
         if key_list.contains(&key) {
             return;
@@ -45,12 +45,12 @@ impl<B: InputBind> Bindings<B> {
     }
 
     /// Unbind a key and binding pair
-    pub fn unbind(&mut self, key: &Key, input: B) {
+    pub fn unbind(&mut self, key: &Input, input: B) {
         self.key_map.entry(input).or_default().retain(|k| k != key)
     }
 
     /// Transform an input into a list of its bound keys
-    pub fn transform(&self, input: &B) -> &[Key] {
+    pub fn transform(&self, input: &B) -> &[Input] {
         self.key_map.get(input).map(Vec::as_slice).unwrap_or(&[])
     }
 }
@@ -58,7 +58,7 @@ impl<B: InputBind> Bindings<B> {
 /// An axis binding that combines two [`Bindings`] two form a 1 dimensional axis
 ///
 /// Use [`crate::InputManager::axis`] to get a value from your axis bind or one of the multi dimension methods:
-/// [`crate::InputManager::axis2`], [`crate::InputManager::axis2_norm`], [`crate::InputManager::axis3`] or [`crate::InputManager::axis3_norm`]
+/// [`crate::InputManager::axis_n`] or [`crate::InputManager::axis_n_norm`]
 #[derive(Debug)]
 pub struct AxisBind<'a, B: InputBind> {
     /// The binding for the positive direction

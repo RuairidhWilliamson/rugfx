@@ -5,20 +5,21 @@ use std::{
 
 use winit::{
     dpi::PhysicalSize,
-    event::{DeviceEvent, Event, KeyboardInput, WindowEvent},
+    event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseScrollDelta, WindowEvent},
 };
 
-use crate::key::Key;
+use crate::Input;
 
 /// Stores state about keys, mouse motion, timing and other window events.
 #[derive(Debug)]
 pub struct RawInputManager {
-    keys_held: HashSet<Key>,
-    keys_pressed: HashSet<Key>,
-    keys_released: HashSet<Key>,
+    keys_held: HashSet<Input>,
+    keys_pressed: HashSet<Input>,
+    keys_released: HashSet<Input>,
 
-    mouse_motion: (f64, f64),
-    mouse_position: (f64, f64),
+    mouse_motion: [f64; 2],
+    mouse_position: [f64; 2],
+    mouse_wheel_delta: [f32; 2],
 
     start: Instant,
     last_update: Instant,
@@ -35,8 +36,9 @@ impl Default for RawInputManager {
             keys_held: HashSet::default(),
             keys_pressed: HashSet::default(),
             keys_released: HashSet::default(),
-            mouse_motion: (0.0, 0.0),
-            mouse_position: (0.0, 0.0),
+            mouse_motion: [0.0, 0.0],
+            mouse_position: [0.0, 0.0],
+            mouse_wheel_delta: [0.0, 0.0],
 
             start: Instant::now(),
             last_update: Instant::now(),
@@ -70,7 +72,17 @@ impl RawInputManager {
             WindowEvent::CloseRequested => self.close_requested = true,
             WindowEvent::Resized(size) => self.resize = Some(*size),
             WindowEvent::CursorMoved { position, .. } => {
-                self.mouse_position = (position.x, position.y)
+                self.mouse_position = [position.x, position.y];
+            }
+            WindowEvent::MouseWheel {
+                delta: MouseScrollDelta::LineDelta(x, y),
+                ..
+            } => {
+                self.mouse_wheel_delta[0] += x;
+                self.mouse_wheel_delta[1] += y;
+            }
+            WindowEvent::MouseInput { button, state, .. } => {
+                self.update_input((*button).into(), *state)
             }
             _ => (),
         }
@@ -78,7 +90,8 @@ impl RawInputManager {
 
     fn process_device_event(&mut self, event: &DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta } = event {
-            self.mouse_motion = (self.mouse_motion.0 + delta.0, self.mouse_motion.1 + delta.1);
+            self.mouse_motion[0] += delta.0;
+            self.mouse_motion[1] += delta.1;
         }
     }
 
@@ -89,9 +102,9 @@ impl RawInputManager {
     }
 
     fn process_keyboard_input(&mut self, input: &KeyboardInput) {
-        self.update_key(input.scancode.into(), input.state);
+        self.update_input(input.scancode.into(), input.state);
         if let Some(vkey) = input.virtual_keycode {
-            self.update_key(vkey.into(), input.state);
+            self.update_input(vkey.into(), input.state);
         };
     }
 
@@ -99,15 +112,15 @@ impl RawInputManager {
         self.loop_destroyed = true;
     }
 
-    fn update_key(&mut self, key: Key, state: winit::event::ElementState) {
+    fn update_input(&mut self, input: Input, state: ElementState) {
         match state {
-            winit::event::ElementState::Pressed => {
-                self.keys_held.insert(key);
-                self.keys_pressed.insert(key);
+            ElementState::Pressed => {
+                self.keys_held.insert(input);
+                self.keys_pressed.insert(input);
             }
-            winit::event::ElementState::Released => {
-                self.keys_held.remove(&key);
-                self.keys_released.insert(key);
+            ElementState::Released => {
+                self.keys_held.remove(&input);
+                self.keys_released.insert(input);
             }
         }
     }
@@ -115,33 +128,34 @@ impl RawInputManager {
     fn clear(&mut self) {
         self.keys_pressed.clear();
         // self.keys_released.clear();
-        self.mouse_motion = (0.0, 0.0);
+        self.mouse_motion = [0.0; 2];
+        self.mouse_wheel_delta = [0.0; 2];
         self.resize = None;
         self.close_requested = false;
     }
 
     /// If a key was pressed since the last update
-    pub fn pressed(&self, key: &Key) -> bool {
-        self.keys_pressed.contains(key)
+    pub fn pressed(&self, input: &Input) -> bool {
+        self.keys_pressed.contains(input)
     }
 
     /// If a key was held at all since the last update
-    pub fn held(&self, key: &Key) -> bool {
-        self.keys_held.contains(key)
+    pub fn held(&self, input: &Input) -> bool {
+        self.keys_held.contains(input)
     }
 
     /// If a key was released since the last update
-    pub fn released(&self, key: &Key) -> bool {
-        self.keys_released.contains(key)
+    pub fn released(&self, input: &Input) -> bool {
+        self.keys_released.contains(input)
     }
 
     /// The motion of the mouse since the last update
-    pub fn mouse_motion(&self) -> (f64, f64) {
+    pub fn mouse_motion(&self) -> [f64; 2] {
         self.mouse_motion
     }
 
     /// Returns the mouse position relative to the current window
-    pub fn mouse_position(&self) -> (f64, f64) {
+    pub fn mouse_position(&self) -> [f64; 2] {
         self.mouse_position
     }
 
