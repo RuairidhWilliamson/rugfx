@@ -106,45 +106,26 @@ impl<B: InputBind> InputManager<B> {
         self.delta_time().as_secs_f64()
     }
 
-    /// Get the 1D axis
+    /// Get the 1-D axis
     pub fn axis(&self, bind: AxisBind<B>) -> f32 {
         (if self.held(bind.pos) { 1.0 } else { 0.0 })
             - (if self.held(bind.neg) { 1.0 } else { 0.0 })
     }
 
-    /// Get the 2D axis
-    pub fn axis2(&self, binds: [AxisBind<B>; 2]) -> [f32; 2] {
-        let [x, y] = binds;
-        [self.axis(x), self.axis(y)]
+    /// Get the N-D axis
+    pub fn axis_n<const N: usize>(&self, binds: [AxisBind<B>; N]) -> [f32; N] {
+        binds.map(|axis| self.axis(axis))
     }
 
-    /// Get the 2D axis on the unit circle
-    pub fn axis2_norm(&self, binds: [AxisBind<B>; 2]) -> [f32; 2] {
-        let [x, y] = self.axis2(binds);
-        let m2 = x * x + y * y;
-        if m2 == 0.0 {
-            [0.0, 0.0]
+    /// Get the N-D axis with the length of 1 or 0
+    pub fn axis_n_norm<const N: usize>(&self, binds: [AxisBind<B>; N]) -> [f32; N] {
+        let axes = self.axis_n(binds);
+        let sqr_mag: f32 = axes.iter().map(|x| x * x).sum();
+        if sqr_mag == 0.0 {
+            [0.0; N]
         } else {
-            let m = m2.sqrt();
-            [x / m, y / m]
-        }
-    }
-
-    /// Get the 3D axis
-    pub fn axis3(&self, binds: [AxisBind<B>; 3]) -> [f32; 3] {
-        let [x, y, z] = binds;
-        [self.axis(x), self.axis(y), self.axis(z)]
-    }
-
-    /// Get the 3D axis on the unit sphere
-    pub fn axis3_norm(&self, binds: [AxisBind<B>; 3]) -> [f32; 3] {
-        let [x, y, z] = self.axis3(binds);
-        let m2 = x * x + y * y + z * z;
-        if m2 == 0.0 {
-            [0.0, 0.0, 0.0]
-        } else {
-            let m = m2.sqrt();
-            [x / m, y / m, z / m]
+            let m = sqr_mag.sqrt();
+            axes.map(|x| x / m)
         }
     }
 

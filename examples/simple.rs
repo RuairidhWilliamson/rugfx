@@ -10,7 +10,7 @@ enum Bind {
 fn main() {
     let mut input_manager = InputManager::<Bind>::default();
     let event_loop = winit::event_loop::EventLoop::new();
-    let window = winit::window::Window::new(&event_loop).unwrap();
+    let _window = winit::window::Window::new(&event_loop).unwrap();
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_wait();
         println!("Received event {event:?}");
