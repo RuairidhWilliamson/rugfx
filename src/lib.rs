@@ -9,6 +9,6 @@ mod ticker;
 
 pub use bindings::{AxisBind, Bindings, InputBind};
 pub use input_manager::InputManager;
-pub use inputs::{Input, Key};
+pub use inputs::Input;
 pub use raw::RawInputManager;
 pub use ticker::Ticker;

@@ -81,13 +81,13 @@ pub struct AxisBind<'a, B: InputBind> {
 ///     Right,
 /// }
 ///
-/// use winit::event::VirtualKeyCode as VK;
+/// use winit::keyboard::{PhysicalKey, KeyCode};
 /// use Binds::*;
 /// let bindings: Bindings<Binds> = dry_binds!{
-///     VK::W => Up,
-///     VK::A => Left,
-///     VK::S => Down,
-///     VK::D => Right,
+///     KeyCode::KeyW => Up,
+///     KeyCode::KeyA => Left,
+///     KeyCode::KeyS => Down,
+///     KeyCode::KeyD => Right,
 /// };
 /// ```
 #[macro_export]

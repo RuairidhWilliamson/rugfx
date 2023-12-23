@@ -139,13 +139,14 @@ impl<B: InputBind> InputManager<B> {
 
 #[cfg(test)]
 mod tests {
-    use winit::event::VirtualKeyCode;
+
+    use winit::keyboard::{KeyCode, PhysicalKey};
 
     use super::InputManager;
 
     #[test]
     fn no_binds() {
         let im = InputManager::<()>::default();
-        assert!(!im.raw.pressed(&VirtualKeyCode::Escape.into()));
+        assert!(!im.raw.pressed(&PhysicalKey::Code(KeyCode::Escape).into()));
     }
 }

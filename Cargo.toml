@@ -7,4 +7,7 @@ edition = "2021"
 unstable = []
 
 [dependencies]
-winit = "0.28"
+winit = "0.29"
+
+[dev-dependencies]
+softbuffer = "0.4"

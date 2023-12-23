@@ -5,7 +5,7 @@ use std::{
 
 use winit::{
     dpi::PhysicalSize,
-    event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseScrollDelta, WindowEvent},
+    event::{DeviceEvent, ElementState, Event, KeyEvent, MouseScrollDelta, WindowEvent},
 };
 
 use crate::Input;
@@ -27,7 +27,7 @@ pub struct RawInputManager {
 
     resize: Option<PhysicalSize<u32>>,
     close_requested: bool,
-    loop_destroyed: bool,
+    loop_exiting: bool,
 }
 
 impl Default for RawInputManager {
@@ -46,7 +46,7 @@ impl Default for RawInputManager {
 
             resize: None,
             close_requested: false,
-            loop_destroyed: false,
+            loop_exiting: false,
         }
     }
 }
@@ -54,25 +54,42 @@ impl Default for RawInputManager {
 impl RawInputManager {
     /// Pass all [`winit::event::Event`] in here
     pub fn pass_event<T: std::fmt::Debug>(&mut self, event: &Event<T>) -> bool {
-        let is_update = matches!(event, Event::MainEventsCleared);
         match event {
-            Event::NewEvents(_) => self.clear(),
+            Event::NewEvents(_) => {
+                self.clear();
+                false
+            }
             Event::WindowEvent { event, .. } => self.process_window_event(event),
-            Event::DeviceEvent { event, .. } => self.process_device_event(event),
-            Event::MainEventsCleared => self.process_events_cleared(),
-            Event::LoopDestroyed => self.process_loop_destroyed(),
-            _ => (),
+            Event::DeviceEvent { event, .. } => {
+                self.process_device_event(event);
+                false
+            }
+            Event::AboutToWait => true,
+            Event::LoopExiting => {
+                self.process_loop_exiting();
+                false
+            }
+            _ => false,
         }
-        is_update
     }
 
-    fn process_window_event(&mut self, event: &WindowEvent) {
+    fn process_window_event(&mut self, event: &WindowEvent) -> bool {
         match event {
-            WindowEvent::KeyboardInput { input, .. } => self.process_keyboard_input(input),
-            WindowEvent::CloseRequested => self.close_requested = true,
-            WindowEvent::Resized(size) => self.resize = Some(*size),
+            WindowEvent::KeyboardInput { event, .. } => {
+                self.process_keyboard_input(event);
+                false
+            }
+            WindowEvent::CloseRequested => {
+                self.close_requested = true;
+                false
+            }
+            WindowEvent::Resized(size) => {
+                self.resize = Some(*size);
+                false
+            }
             WindowEvent::CursorMoved { position, .. } => {
                 self.mouse_position = [position.x, position.y];
+                false
             }
             WindowEvent::MouseWheel {
                 delta: MouseScrollDelta::LineDelta(x, y),
@@ -80,11 +97,17 @@ impl RawInputManager {
             } => {
                 self.mouse_wheel_delta[0] += x;
                 self.mouse_wheel_delta[1] += y;
+                false
             }
             WindowEvent::MouseInput { button, state, .. } => {
-                self.update_input((*button).into(), *state)
+                self.update_input((*button).into(), *state);
+                false
             }
-            _ => (),
+            WindowEvent::RedrawRequested => {
+                self.process_redraw_requested();
+                true
+            }
+            _ => false,
         }
     }
 
@@ -95,21 +118,18 @@ impl RawInputManager {
         }
     }
 
-    fn process_events_cleared(&mut self) {
+    fn process_redraw_requested(&mut self) {
         let now = Instant::now();
         self.update_delta = now.saturating_duration_since(self.last_update);
         self.last_update = now;
     }
 
-    fn process_keyboard_input(&mut self, input: &KeyboardInput) {
-        self.update_input(input.scancode.into(), input.state);
-        if let Some(vkey) = input.virtual_keycode {
-            self.update_input(vkey.into(), input.state);
-        };
+    fn process_keyboard_input(&mut self, event: &KeyEvent) {
+        self.update_input(event.physical_key.into(), event.state);
     }
 
-    fn process_loop_destroyed(&mut self) {
-        self.loop_destroyed = true;
+    fn process_loop_exiting(&mut self) {
+        self.loop_exiting = true;
     }
 
     fn update_input(&mut self, input: Input, state: ElementState) {
@@ -195,9 +215,9 @@ impl RawInputManager {
 
     /// Returns true if the winit event loop was destroyed.
     ///
-    /// See [`winit::event::Event::LoopDestroyed`].
-    pub fn loop_destroyed(&self) -> bool {
-        self.loop_destroyed
+    /// See [`winit::event::Event::LoopExiting`].
+    pub fn loop_exiting(&self) -> bool {
+        self.loop_exiting
     }
 
     /// The total time since the start of the game
