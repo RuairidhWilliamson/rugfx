@@ -59,12 +59,18 @@ impl RawInputManager {
                 self.clear();
                 false
             }
-            Event::WindowEvent { event, .. } => self.process_window_event(event),
+            Event::WindowEvent { event, .. } => {
+                self.process_window_event(event);
+                false
+            }
             Event::DeviceEvent { event, .. } => {
                 self.process_device_event(event);
                 false
             }
-            Event::AboutToWait => true,
+            Event::AboutToWait => {
+                self.process_about_to_wait();
+                true
+            }
             Event::LoopExiting => {
                 self.process_loop_exiting();
                 false
@@ -73,23 +79,19 @@ impl RawInputManager {
         }
     }
 
-    fn process_window_event(&mut self, event: &WindowEvent) -> bool {
+    fn process_window_event(&mut self, event: &WindowEvent) {
         match event {
             WindowEvent::KeyboardInput { event, .. } => {
                 self.process_keyboard_input(event);
-                false
             }
             WindowEvent::CloseRequested => {
                 self.close_requested = true;
-                false
             }
             WindowEvent::Resized(size) => {
                 self.resize = Some(*size);
-                false
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.mouse_position = [position.x, position.y];
-                false
             }
             WindowEvent::MouseWheel {
                 delta: MouseScrollDelta::LineDelta(x, y),
@@ -97,17 +99,14 @@ impl RawInputManager {
             } => {
                 self.mouse_wheel_delta[0] += x;
                 self.mouse_wheel_delta[1] += y;
-                false
             }
             WindowEvent::MouseInput { button, state, .. } => {
                 self.update_input((*button).into(), *state);
-                false
             }
-            WindowEvent::RedrawRequested => {
-                self.process_redraw_requested();
-                true
+            WindowEvent::Focused(false) => {
+                self.process_lost_focus();
             }
-            _ => false,
+            _ => (),
         }
     }
 
@@ -118,7 +117,7 @@ impl RawInputManager {
         }
     }
 
-    fn process_redraw_requested(&mut self) {
+    fn process_about_to_wait(&mut self) {
         let now = Instant::now();
         self.update_delta = now.saturating_duration_since(self.last_update);
         self.last_update = now;
@@ -126,6 +125,10 @@ impl RawInputManager {
 
     fn process_keyboard_input(&mut self, event: &KeyEvent) {
         self.update_input(event.physical_key.into(), event.state);
+    }
+
+    fn process_lost_focus(&mut self) {
+        self.keys_held.clear();
     }
 
     fn process_loop_exiting(&mut self) {
