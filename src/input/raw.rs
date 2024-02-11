@@ -150,7 +150,7 @@ impl RawInputManager {
 
     fn clear(&mut self) {
         self.keys_pressed.clear();
-        // self.keys_released.clear();
+        self.keys_released.clear();
         self.mouse_motion = [0.0; 2];
         self.mouse_wheel_delta = [0.0; 2];
         self.resize = None;
