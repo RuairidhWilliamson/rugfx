@@ -8,7 +8,7 @@ use winit::{
     event::{DeviceEvent, ElementState, Event, KeyEvent, MouseScrollDelta, WindowEvent},
 };
 
-use crate::Input;
+use super::Input;
 
 /// Stores state about keys, mouse motion, timing and other window events.
 #[derive(Debug)]

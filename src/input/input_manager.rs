@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use winit::event::Event;
 
-use crate::{
+use super::{
     bindings::{AxisBind, Bindings, InputBind},
     raw::RawInputManager,
 };

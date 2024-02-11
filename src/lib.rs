@@ -1,14 +1,5 @@
-#![warn(missing_docs, clippy::unwrap_used)]
-//! Provides useful input manager for working with winit event loops
+pub mod gfx;
+pub mod input;
 
-mod bindings;
-mod input_manager;
-mod inputs;
-mod raw;
-mod ticker;
-
-pub use bindings::{AxisBind, Bindings, InputBind};
-pub use input_manager::InputManager;
-pub use inputs::Input;
-pub use raw::RawInputManager;
-pub use ticker::Ticker;
+pub use wgpu;
+pub use winit;

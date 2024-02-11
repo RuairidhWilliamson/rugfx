@@ -1,1 +1,1 @@
-Inspired by https://github.com/rukai/winit_input_helper
+Useful helper library for common operations involving wgpu and winit.

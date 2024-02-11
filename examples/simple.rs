@@ -1,6 +1,11 @@
+#![allow(clippy::unwrap_used)]
+
 use std::{num::NonZeroU32, rc::Rc};
 
-use ru_input_helper::{dry_binds, Bindings, InputManager};
+use rugfx::{
+    dry_binds,
+    input::{Bindings, InputManager},
+};
 use winit::keyboard::KeyCode;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -29,9 +34,7 @@ fn main() {
     event_loop
         .run(move |event, elwt| {
             elwt.set_control_flow(winit::event_loop::ControlFlow::Wait);
-            // println!("Received event {event:?}");
             if input_manager.pass_event(&event) {
-                // println!("draw");
                 if input_manager.pressed(&Bind::A) {
                     println!("A pressed");
                 }

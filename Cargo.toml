@@ -1,13 +1,29 @@
 [package]
-name = "ru-input-helper"
+name = "rugfx"
 version = "0.0.0"
 edition = "2021"
 
+[lints.rust]
+unsafe_code = "forbid"
+[lints.clippy]
+unwrap_used = "warn"
+
 [features]
+default = ["capture"]
+
+# Capture screenshots
+capture = ["dep:png"]
+
+# Unstable features
 unstable = []
 
 [dependencies]
+wgpu = "0.19"
 winit = "0.29"
+thiserror = "1.0"
+pollster = "0.3"
+png = { version = "0.17", optional = true }
+log = "0.4"
 
 [dev-dependencies]
 softbuffer = "0.4"

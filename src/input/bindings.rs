@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use crate::inputs::Input;
+use super::Input;
 
 /// A trait alias for what your [`InputBind`] must implement.
 ///
@@ -57,8 +57,8 @@ impl<B: InputBind> Bindings<B> {
 
 /// An axis binding that combines two [`Bindings`] two form a 1 dimensional axis
 ///
-/// Use [`crate::InputManager::axis`] to get a value from your axis bind or one of the multi dimension methods:
-/// [`crate::InputManager::axis_n`] or [`crate::InputManager::axis_n_norm`]
+/// Use [`crate::input::InputManager::axis`] to get a value from your axis bind or one of the multi dimension methods:
+/// [`crate::input::InputManager::axis_n`] or [`crate::input::InputManager::axis_n_norm`]
 #[derive(Debug)]
 pub struct AxisBind<'a, B: InputBind> {
     /// The binding for the positive direction
@@ -67,11 +67,11 @@ pub struct AxisBind<'a, B: InputBind> {
     pub neg: &'a B,
 }
 
-/// Convenience macro for declaring bindings quickly.
+/// Convenience macro for declaring input bindings quickly.
 ///
 /// # Example
 /// ```
-/// use ru_input_helper::{Bindings, dry_binds};
+/// use rugfx::{input::Bindings, dry_binds};
 ///
 /// #[derive(PartialEq, Eq, Hash)]
 /// enum Binds {
