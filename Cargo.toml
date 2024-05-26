@@ -18,8 +18,8 @@ capture = ["dep:png"]
 unstable = []
 
 [dependencies]
-wgpu = "0.19"
-winit = "0.29"
+wgpu = "0.20"
+winit = "0.30"
 thiserror = "1.0"
 pollster = "0.3"
 png = { version = "0.17", optional = true }

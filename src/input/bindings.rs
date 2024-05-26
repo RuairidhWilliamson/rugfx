@@ -17,8 +17,8 @@ use super::Input;
 ///     Right,
 /// }
 /// ```
-pub trait InputBind: PartialEq + Eq + Hash {}
-impl<B> InputBind for B where B: PartialEq + Eq + Hash {}
+pub trait InputBind: PartialEq + Eq + Hash + 'static {}
+impl<B> InputBind for B where B: PartialEq + Eq + Hash + 'static {}
 
 /// A map of keys to their bindings.
 #[derive(Debug)]
@@ -93,7 +93,7 @@ pub struct AxisBind<'a, B: InputBind> {
 #[macro_export]
 macro_rules! dry_binds {
     ($($key:expr => $bind:expr),* $(,)?) => {{
-        let mut binds = Bindings::default();
+        let mut binds = rugfx::input::bindings::Bindings::default();
         $(binds.bind($key.into(), $bind));*;
         binds
     }}

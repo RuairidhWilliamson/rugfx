@@ -3,16 +3,11 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
 };
 
-mod bindings;
-mod input_manager;
-mod inputs;
-mod raw;
-mod ticker;
-
-pub use bindings::{AxisBind, Bindings, InputBind};
-pub use input_manager::InputManager;
-pub use raw::RawInputManager;
-pub use ticker::Ticker;
+pub mod bindings;
+pub mod input_manager;
+pub mod inputs;
+pub mod raw;
+pub mod ticker;
 
 /// Input represents any kind of user input
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]

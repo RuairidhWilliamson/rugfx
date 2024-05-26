@@ -1,17 +1,12 @@
 use std::time::Duration;
 
-use winit::event::Event;
-
 use super::{
     bindings::{AxisBind, Bindings, InputBind},
-    raw::RawInputManager,
+    raw::RawInputManagerState,
 };
 
-/// Input manager manages takes events and stores them in a easy to use interface.
-///
-/// Input manager is the recommended interface to use. Pass it all your [`winit::event::Event`]s from your event loop and it will manage state and provide a clean api to access it.
 #[derive(Debug)]
-pub struct InputManager<B: InputBind> {
+pub struct InputManagerState<B: InputBind> {
     /// The mouse sensitivity in the x and y direction. Use a negative value to reverse the mouse.
     pub mouse_sensitivity: [f64; 2],
     /// Input bindings
@@ -24,11 +19,10 @@ pub struct InputManager<B: InputBind> {
     pub smooth_frame_rate_alpha: f32,
     /// The ema smoothed frame rate
     pub smooth_frame_rate: f32,
-    /// The underlying raw input manager
-    pub raw: RawInputManager,
+    pub raw: RawInputManagerState,
 }
 
-impl<B: InputBind> Default for InputManager<B> {
+impl<B: InputBind> Default for InputManagerState<B> {
     fn default() -> Self {
         Self {
             mouse_sensitivity: [1.0, 1.0],
@@ -37,21 +31,17 @@ impl<B: InputBind> Default for InputManager<B> {
             time_scale: 1.0,
             smooth_frame_rate_alpha: 0.05,
             smooth_frame_rate: 0.0,
-            raw: RawInputManager::default(),
+            raw: RawInputManagerState::default(),
         }
     }
 }
 
-impl<B: InputBind> InputManager<B> {
-    /// Pass the [`winit::event::Event`] to the input manager. Should be called every time in the event loop.
-    pub fn pass_event<T: std::fmt::Debug>(&mut self, event: &Event<T>) -> bool {
-        let is_update = self.raw.pass_event(event);
-        if is_update {
-            self.time += self.delta_time();
-            self.smooth_frame_rate = self.smooth_frame_rate_alpha * self.raw.frame_rate()
-                + (1.0 - self.smooth_frame_rate_alpha) * self.smooth_frame_rate;
-        }
-        is_update
+impl<B: InputBind> InputManagerState<B> {
+    pub fn preupdate(&mut self) {
+        self.raw.preupdate();
+        self.time += self.delta_time();
+        self.smooth_frame_rate = self.smooth_frame_rate_alpha * self.raw.frame_rate()
+            + (1.0 - self.smooth_frame_rate_alpha) * self.smooth_frame_rate;
     }
 
     /// Returns true if the binding was pressed since the last update
@@ -129,24 +119,10 @@ impl<B: InputBind> InputManager<B> {
         }
     }
 
-    /// Returns [`true`] every [`time`] interval
+    /// Returns [`true`] every [`time`] interval measured in seconds
     #[cfg(feature = "unstable")]
     pub fn every(&self, time: f32) -> bool {
         // TODO: The soundness of the floating point number maths here needs to be verified that every is called every time
         self.time.as_secs_f32() % time < self.delta_time_f32()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use winit::keyboard::{KeyCode, PhysicalKey};
-
-    use super::InputManager;
-
-    #[test]
-    fn no_binds() {
-        let im = InputManager::<()>::default();
-        assert!(!im.raw.pressed(&PhysicalKey::Code(KeyCode::Escape).into()));
     }
 }

@@ -4,15 +4,21 @@ use std::{
 };
 
 use winit::{
+    application::ApplicationHandler,
     dpi::PhysicalSize,
-    event::{DeviceEvent, ElementState, Event, KeyEvent, MouseScrollDelta, WindowEvent},
+    event::{DeviceEvent, ElementState, MouseScrollDelta, StartCause, WindowEvent},
 };
 
 use super::Input;
 
 /// Stores state about keys, mouse motion, timing and other window events.
+pub struct RawInputManager<H> {
+    pub handler: H,
+    state: RawInputManagerState,
+}
+
 #[derive(Debug)]
-pub struct RawInputManager {
+pub struct RawInputManagerState {
     keys_held: HashSet<Input>,
     keys_pressed: HashSet<Input>,
     keys_released: HashSet<Input>,
@@ -30,7 +36,75 @@ pub struct RawInputManager {
     loop_exiting: bool,
 }
 
-impl Default for RawInputManager {
+impl<H: RawInputHandler> ApplicationHandler for RawInputManager<H> {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        self.handler.resumed(event_loop)
+    }
+
+    fn window_event(
+        &mut self,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        self.state.process_window_event(event);
+    }
+
+    fn new_events(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        cause: winit::event::StartCause,
+    ) {
+        self.state.preupdate();
+        self.handler.update(event_loop, &self.state);
+        // We can't draw on the StartCause::Init new_events because resume has not been called and hence created the window
+        if cause != StartCause::Init {
+            self.handler.draw(event_loop, &self.state);
+        }
+        self.state.clear();
+    }
+
+    fn device_event(
+        &mut self,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        _device_id: winit::event::DeviceId,
+        event: DeviceEvent,
+    ) {
+        if let DeviceEvent::MouseMotion { delta } = event {
+            self.state.mouse_motion[0] += delta.0;
+            self.state.mouse_motion[1] += delta.1;
+        }
+    }
+
+    fn exiting(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        self.state.loop_exiting = true;
+    }
+}
+
+pub trait RawInputHandler {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop);
+    fn update(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        input: &RawInputManagerState,
+    );
+    fn draw(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        input: &RawInputManagerState,
+    );
+}
+
+impl<H: RawInputHandler> RawInputManager<H> {
+    pub fn new(handler: H) -> Self {
+        Self {
+            handler,
+            state: RawInputManagerState::default(),
+        }
+    }
+}
+
+impl Default for RawInputManagerState {
     fn default() -> Self {
         Self {
             keys_held: HashSet::default(),
@@ -51,44 +125,17 @@ impl Default for RawInputManager {
     }
 }
 
-impl RawInputManager {
-    /// Pass all [`winit::event::Event`] in here
-    pub fn pass_event<T: std::fmt::Debug>(&mut self, event: &Event<T>) -> bool {
-        match event {
-            Event::NewEvents(_) => {
-                self.clear();
-                false
-            }
-            Event::WindowEvent { event, .. } => {
-                self.process_window_event(event);
-                false
-            }
-            Event::DeviceEvent { event, .. } => {
-                self.process_device_event(event);
-                false
-            }
-            Event::AboutToWait => {
-                self.process_about_to_wait();
-                true
-            }
-            Event::LoopExiting => {
-                self.process_loop_exiting();
-                false
-            }
-            _ => false,
-        }
-    }
-
-    fn process_window_event(&mut self, event: &WindowEvent) {
+impl RawInputManagerState {
+    pub fn process_window_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::KeyboardInput { event, .. } => {
-                self.process_keyboard_input(event);
+                self.update_input(event.physical_key.into(), event.state);
             }
             WindowEvent::CloseRequested => {
                 self.close_requested = true;
             }
             WindowEvent::Resized(size) => {
-                self.resize = Some(*size);
+                self.resize = Some(size);
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.mouse_position = [position.x, position.y];
@@ -101,38 +148,14 @@ impl RawInputManager {
                 self.mouse_wheel_delta[1] += y;
             }
             WindowEvent::MouseInput { button, state, .. } => {
-                self.update_input((*button).into(), *state);
+                self.update_input(button.into(), state);
             }
             WindowEvent::Focused(false) => {
-                self.process_lost_focus();
+                // When lost focus clear the keys held
+                self.keys_held.clear();
             }
             _ => (),
         }
-    }
-
-    fn process_device_event(&mut self, event: &DeviceEvent) {
-        if let DeviceEvent::MouseMotion { delta } = event {
-            self.mouse_motion[0] += delta.0;
-            self.mouse_motion[1] += delta.1;
-        }
-    }
-
-    fn process_about_to_wait(&mut self) {
-        let now = Instant::now();
-        self.update_delta = now.saturating_duration_since(self.last_update);
-        self.last_update = now;
-    }
-
-    fn process_keyboard_input(&mut self, event: &KeyEvent) {
-        self.update_input(event.physical_key.into(), event.state);
-    }
-
-    fn process_lost_focus(&mut self) {
-        self.keys_held.clear();
-    }
-
-    fn process_loop_exiting(&mut self) {
-        self.loop_exiting = true;
     }
 
     fn update_input(&mut self, input: Input, state: ElementState) {
@@ -148,7 +171,13 @@ impl RawInputManager {
         }
     }
 
-    fn clear(&mut self) {
+    pub fn preupdate(&mut self) {
+        let now = Instant::now();
+        self.update_delta = now.saturating_duration_since(self.last_update);
+        self.last_update = now;
+    }
+
+    pub fn clear(&mut self) {
         self.keys_pressed.clear();
         self.keys_released.clear();
         self.mouse_motion = [0.0; 2];
