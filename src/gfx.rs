@@ -29,9 +29,19 @@ pub enum GfxError {
     RequestDeviceError(#[from] RequestDeviceError),
 }
 
-#[derive(Default)]
 pub struct GfxConfig {
     pub present_mode: wgpu::PresentMode,
+    pub required_features: wgpu::Features,
+}
+
+impl Default for GfxConfig {
+    fn default() -> Self {
+        Self {
+            present_mode: wgpu::PresentMode::default(),
+            required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
+                | wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER,
+        }
+    }
 }
 
 pub struct Gfx {
@@ -55,7 +65,7 @@ impl Gfx {
                 })
                 .await
                 .ok_or(GfxError::RequestAdapterError)?;
-            let (device, queue) = Self::request_device(&adapter).await?;
+            let (device, queue) = Self::request_device(&adapter, &config).await?;
             let size = window.inner_size();
             let internal = GfxInternal::Surface { surface, window };
 
@@ -74,7 +84,7 @@ impl Gfx {
                 })
                 .await
                 .ok_or(GfxError::RequestAdapterError)?;
-            let (device, queue) = Self::request_device(&adapter).await?;
+            let (device, queue) = Self::request_device(&adapter, &config).await?;
             let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
             let bytes_per_row = 4 * size.width + (align - (4 * size.width) % align) % align;
             let buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -120,13 +130,13 @@ impl Gfx {
 
     async fn request_device(
         adapter: &wgpu::Adapter,
+        config: &GfxConfig,
     ) -> Result<(wgpu::Device, wgpu::Queue), GfxError> {
         Ok(adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
-                        | wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER,
+                    required_features: config.required_features,
                     required_limits: wgpu::Limits {
                         max_texture_dimension_1d: 8192,
                         max_texture_dimension_2d: 8192,
