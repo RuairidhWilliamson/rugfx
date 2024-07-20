@@ -57,8 +57,8 @@ impl<B: InputBind> Bindings<B> {
 
 /// An axis binding that combines two [`Bindings`] two form a 1 dimensional axis
 ///
-/// Use [`crate::input::InputManager::axis`] to get a value from your axis bind or one of the multi dimension methods:
-/// [`crate::input::InputManager::axis_n`] or [`crate::input::InputManager::axis_n_norm`]
+/// Use [`crate::input::input_manager::InputManagerState::axis`] to get a value from your axis bind or one of the multi dimension methods:
+/// [`crate::input::input_manager::InputManagerState::axis_n`] or [`crate::input::input_manager::InputManagerState::axis_n_norm`]
 #[derive(Debug)]
 pub struct AxisBind<'a, B: InputBind> {
     /// The binding for the positive direction
@@ -71,7 +71,7 @@ pub struct AxisBind<'a, B: InputBind> {
 ///
 /// # Example
 /// ```
-/// use rugfx::{input::Bindings, dry_binds};
+/// use rugfx::{input::bindings::Bindings, dry_binds};
 ///
 /// #[derive(PartialEq, Eq, Hash)]
 /// enum Binds {
