@@ -232,6 +232,13 @@ impl Gfx {
     pub fn aspect_ratio(&self) -> f32 {
         self.config.width as f32 / self.config.height as f32
     }
+
+    pub fn window(&self) -> Option<&Window> {
+        let GfxInternal::Surface { window, .. } = &self.internal else {
+            return None;
+        };
+        Some(window)
+    }
 }
 
 enum GfxInternal {
