@@ -18,10 +18,10 @@ capture = ["dep:png"]
 unstable = []
 
 [dependencies]
-wgpu = { version = "22.0", default-features = false, features = ["wgsl", "dx12", "metal"]}
+wgpu = { version = "23.0", default-features = false, features = ["wgsl", "dx12", "metal"]}
 winit = "0.30"
 thiserror = "1.0"
-pollster = "0.3"
+pollster = "0.4"
 png = { version = "0.17", optional = true }
 log = "0.4"
 
