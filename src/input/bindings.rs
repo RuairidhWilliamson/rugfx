@@ -46,12 +46,12 @@ impl<B: InputBind> Bindings<B> {
 
     /// Unbind a key and binding pair
     pub fn unbind(&mut self, key: &Input, input: B) {
-        self.key_map.entry(input).or_default().retain(|k| k != key)
+        self.key_map.entry(input).or_default().retain(|k| k != key);
     }
 
     /// Transform an input into a list of its bound keys
     pub fn transform(&self, input: &B) -> &[Input] {
-        self.key_map.get(input).map(Vec::as_slice).unwrap_or(&[])
+        self.key_map.get(input).map_or(&[], Vec::as_slice)
     }
 }
 
@@ -59,7 +59,7 @@ impl<B: InputBind> Bindings<B> {
 ///
 /// Use [`crate::input::input_manager::InputManagerState::axis`] to get a value from your axis bind or one of the multi dimension methods:
 /// [`crate::input::input_manager::InputManagerState::axis_n`] or [`crate::input::input_manager::InputManagerState::axis_n_norm`]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct AxisBind<'a, B: InputBind> {
     /// The binding for the positive direction
     pub pos: &'a B,

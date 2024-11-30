@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::print_stdout)]
 
 use std::{num::NonZeroU32, rc::Rc};
 
@@ -11,6 +11,8 @@ use winit::{
     keyboard::KeyCode,
     window::{Window, WindowAttributes},
 };
+
+const DARK_GRAY: u32 = 0xFF_18_18_18;
 
 #[derive(Default)]
 struct App {
@@ -29,8 +31,8 @@ impl CreatedWindow {
                 .create_window(WindowAttributes::default())
                 .unwrap(),
         );
-        let ctx = softbuffer::Context::new(window.clone()).unwrap();
-        let surface = softbuffer::Surface::new(&ctx, window.clone()).unwrap();
+        let ctx = softbuffer::Context::new(Rc::clone(&window)).unwrap();
+        let surface = softbuffer::Surface::new(&ctx, Rc::clone(&window)).unwrap();
         Self { window, surface }
     }
 
@@ -48,7 +50,6 @@ impl CreatedWindow {
             .expect("Failed to resize the softbuffer surface");
 
         // Fill a buffer with a solid color.
-        const DARK_GRAY: u32 = 0xFF181818;
         let mut buffer = self
             .surface
             .buffer_mut()

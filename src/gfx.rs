@@ -1,5 +1,10 @@
+pub mod buffer;
+pub mod surface;
+
 use std::sync::Arc;
 
+use buffer::GfxBuffer;
+use surface::GfxSurface;
 use thiserror::Error;
 use wgpu::{Backends, CreateSurfaceError, RequestDeviceError, SurfaceError, TextureFormat};
 use winit::{
@@ -45,18 +50,18 @@ impl Default for GfxConfig {
 }
 
 pub struct Gfx {
-    internal: GfxInternal,
+    pub backing: GfxBacking,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
 }
 
 impl Gfx {
-    pub fn new_from_window(window: Window, config: GfxConfig) -> Result<Self, GfxError> {
+    pub fn new_from_window(window: Window, config: &GfxConfig) -> Result<Self, GfxError> {
         pollster::block_on(async {
             let instance = Self::create_instance();
             let window = Arc::new(window);
-            let surface = instance.create_surface(window.clone())?;
+            let surface = instance.create_surface(Arc::clone(&window))?;
             let adapter = instance
                 .request_adapter(&wgpu::RequestAdapterOptionsBase {
                     power_preference: wgpu::PowerPreference::HighPerformance,
@@ -65,15 +70,15 @@ impl Gfx {
                 })
                 .await
                 .ok_or(GfxError::RequestAdapterError)?;
-            let (device, queue) = Self::request_device(&adapter, &config).await?;
+            let (device, queue) = Self::request_device(&adapter, config).await?;
             let size = window.inner_size();
-            let internal = GfxInternal::Surface { surface, window };
+            let internal = GfxBacking::Surface(GfxSurface { window, surface });
 
-            Self::setup(adapter, device, queue, internal, size, config).await
+            Ok(Self::setup(&adapter, device, queue, internal, size, config))
         })
     }
 
-    pub fn new_from_buffer(size: PhysicalSize<u32>, config: GfxConfig) -> Result<Self, GfxError> {
+    pub fn new_from_buffer(size: PhysicalSize<u32>, config: &GfxConfig) -> Result<Self, GfxError> {
         pollster::block_on(async {
             let instance = Self::create_instance();
             let adapter = instance
@@ -84,37 +89,9 @@ impl Gfx {
                 })
                 .await
                 .ok_or(GfxError::RequestAdapterError)?;
-            let (device, queue) = Self::request_device(&adapter, &config).await?;
-            let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-            let bytes_per_row = 4 * size.width + (align - (4 * size.width) % align) % align;
-            let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: None,
-                size: (bytes_per_row * size.height) as u64,
-                usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-            let extent = wgpu::Extent3d {
-                width: size.width,
-                height: size.height,
-                depth_or_array_layers: 1,
-            };
-            let texture = device.create_texture(&wgpu::TextureDescriptor {
-                size: extent,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-                label: None,
-                view_formats: &[],
-            });
-            let internal = GfxInternal::Buffer {
-                bytes_per_row,
-                buffer,
-                extent,
-                texture: Box::leak(Box::new(texture)),
-            };
-            Self::setup(adapter, device, queue, internal, size, config).await
+            let (device, queue) = Self::request_device(&adapter, config).await?;
+            let internal = GfxBacking::Buffer(GfxBuffer::new(&device, size));
+            Ok(Self::setup(&adapter, device, queue, internal, size, config))
         })
     }
 
@@ -149,15 +126,23 @@ impl Gfx {
             .await?)
     }
 
-    async fn setup(
-        adapter: wgpu::Adapter,
+    fn setup(
+        adapter: &wgpu::Adapter,
         device: wgpu::Device,
         queue: wgpu::Queue,
-        internal: GfxInternal,
+        internal: GfxBacking,
         size: PhysicalSize<u32>,
-        config: GfxConfig,
-    ) -> Result<Self, GfxError> {
-        let capabilities = internal.get_capabilities(&adapter);
+        config: &GfxConfig,
+    ) -> Self {
+        let capabilities = {
+            let this = &internal;
+            match this {
+                GfxBacking::Surface(GfxSurface { surface, .. }) => {
+                    surface.get_capabilities(adapter)
+                }
+                GfxBacking::Buffer(_) => wgpu::SurfaceCapabilities::default(),
+            }
+        };
         log::debug!("Found texture formats: {:?}", capabilities.formats);
         let texture_format = capabilities
             .formats
@@ -187,145 +172,70 @@ impl Gfx {
             view_formats: vec![texture_format],
             desired_maximum_frame_latency: 2,
         };
-        internal.configure(&device, &config);
+        if let GfxBacking::Surface(GfxSurface { surface, .. }) = &internal {
+            surface.configure(&device, &config);
+        };
 
-        Ok(Self {
+        Self {
+            backing: internal,
             device,
             queue,
-            internal,
             config,
-        })
+        }
     }
 
     pub fn get_current_texture(&self) -> Result<RenderableTexture, GfxError> {
-        self.internal.get_current_texture()
+        {
+            let this = &self.backing;
+            match this {
+                GfxBacking::Surface(GfxSurface { surface, .. }) => {
+                    Ok(RenderableTexture::Surface(surface.get_current_texture()?))
+                }
+                GfxBacking::Buffer(buffer) => {
+                    Ok(RenderableTexture::Texture(Arc::clone(&buffer.texture)))
+                }
+            }
+        }
     }
 
-    pub fn present(&self, renderable_texture: RenderableTexture) {
-        self.internal
-            .present(&self.device, &self.queue, renderable_texture)
+    pub fn present(&self) -> Result<(), GfxError> {
+        match &self.backing {
+            GfxBacking::Surface(GfxSurface { surface, .. }) => {
+                surface.get_current_texture()?.present();
+                Ok(())
+            }
+            GfxBacking::Buffer(buffer) => {
+                let mut encoder = self
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                encoder.copy_texture_to_buffer(
+                    buffer.texture.as_image_copy(),
+                    wgpu::ImageCopyBuffer {
+                        buffer: &buffer.buffer,
+                        layout: wgpu::ImageDataLayout {
+                            offset: 0,
+                            bytes_per_row: Some(buffer.bytes_per_row),
+                            rows_per_image: None,
+                        },
+                    },
+                    buffer.extent,
+                );
+                self.queue.submit(Some(encoder.finish()));
+                Ok(())
+            }
+        }
     }
 
     pub fn window_resize(&mut self, size: &PhysicalSize<u32>) {
         self.config.width = size.width;
         self.config.height = size.height;
-        self.internal.configure(&self.device, &self.config);
+        if let GfxBacking::Surface(GfxSurface { surface, .. }) = &self.backing {
+            surface.configure(&self.device, &self.config);
+        };
     }
 
     pub fn set_cursor_grab(&self, grab: bool) -> Result<(), GfxError> {
-        self.internal.set_cursor_grab(grab)
-    }
-
-    pub fn set_cursor_visible(&self, visible: bool) {
-        self.internal.set_cursor_visible(visible)
-    }
-
-    pub fn toggle_fullscreen(&self) {
-        self.internal.toggle_fullscreen()
-    }
-
-    #[cfg(feature = "capture")]
-    pub fn create_png(&self, output: &std::path::Path) -> Result<(), GfxError> {
-        self.internal.create_png(&self.device, output)
-    }
-
-    pub fn aspect_ratio(&self) -> f32 {
-        self.config.width as f32 / self.config.height as f32
-    }
-
-    pub fn window(&self) -> Option<&Window> {
-        let GfxInternal::Surface { window, .. } = &self.internal else {
-            return None;
-        };
-        Some(window)
-    }
-}
-
-enum GfxInternal {
-    Surface {
-        window: Arc<Window>,
-        surface: wgpu::Surface<'static>,
-    },
-    Buffer {
-        bytes_per_row: u32,
-        buffer: wgpu::Buffer,
-        extent: wgpu::Extent3d,
-        texture: &'static wgpu::Texture,
-    },
-}
-
-fn fullscreen_mode(fullscreen: bool) -> Option<Fullscreen> {
-    if fullscreen {
-        Some(Fullscreen::Borderless(None))
-    } else {
-        None
-    }
-}
-
-impl GfxInternal {
-    fn get_capabilities(&self, adapter: &wgpu::Adapter) -> wgpu::SurfaceCapabilities {
-        if let Self::Surface { surface, .. } = self {
-            surface.get_capabilities(adapter)
-        } else {
-            wgpu::SurfaceCapabilities::default()
-        }
-    }
-
-    fn configure(&self, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) {
-        if let Self::Surface { surface, .. } = self {
-            surface.configure(device, config);
-        }
-    }
-
-    fn get_current_texture(&self) -> Result<RenderableTexture, GfxError> {
-        match self {
-            Self::Surface { surface, .. } => {
-                Ok(RenderableTexture::Surface(surface.get_current_texture()?))
-            }
-            Self::Buffer { texture, .. } => Ok(RenderableTexture::Texture(texture)),
-        }
-    }
-
-    fn present(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        renderable_texture: RenderableTexture,
-    ) {
-        match (self, renderable_texture) {
-            (Self::Surface { .. }, RenderableTexture::Surface(surface)) => surface.present(),
-            (
-                Self::Buffer {
-                    bytes_per_row,
-                    buffer,
-                    extent,
-                    ..
-                },
-                RenderableTexture::Texture(texture),
-            ) => {
-                log::info!("Copying texture to buffer");
-                let mut encoder =
-                    device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-                encoder.copy_texture_to_buffer(
-                    texture.as_image_copy(),
-                    wgpu::ImageCopyBuffer {
-                        buffer,
-                        layout: wgpu::ImageDataLayout {
-                            offset: 0,
-                            bytes_per_row: Some(*bytes_per_row),
-                            rows_per_image: None,
-                        },
-                    },
-                    *extent,
-                );
-                queue.submit(Some(encoder.finish()));
-            }
-            _ => panic!("invalid internal gfx present"),
-        }
-    }
-
-    fn set_cursor_grab(&self, grab: bool) -> Result<(), GfxError> {
-        let Self::Surface { window, .. } = self else {
+        let GfxBacking::Surface(GfxSurface { window, .. }) = &self.backing else {
             return Ok(());
         };
         if grab {
@@ -340,29 +250,28 @@ impl GfxInternal {
         Ok(())
     }
 
-    fn set_cursor_visible(&self, visible: bool) {
-        if let Self::Surface { window, .. } = self {
+    pub fn set_cursor_visible(&self, visible: bool) {
+        if let GfxBacking::Surface(GfxSurface { window, .. }) = &self.backing {
             window.set_cursor_visible(visible);
+        };
+    }
+
+    pub fn toggle_fullscreen(&self) {
+        if let GfxBacking::Surface(GfxSurface { window, .. }) = &self.backing {
+            window.set_fullscreen(fullscreen_mode(window.fullscreen().is_none()));
         }
     }
 
-    fn toggle_fullscreen(&self) {
-        let Self::Surface { window, .. } = self else {
-            return;
-        };
-        window.set_fullscreen(fullscreen_mode(window.fullscreen().is_none()))
-    }
-
     #[cfg(feature = "capture")]
-    fn create_png(&self, device: &wgpu::Device, output: &std::path::Path) -> Result<(), GfxError> {
-        use std::{fs::File, io::Write};
+    pub fn create_png(&self, output: &std::path::Path) -> Result<(), GfxError> {
+        use std::{fs::File, io::Write as _};
 
-        let Self::Buffer {
+        let GfxBacking::Buffer(GfxBuffer {
             bytes_per_row,
             buffer,
             extent,
             ..
-        } = self
+        }) = &self.backing
         else {
             return Err(GfxError::CannotCapturePngFromSurface);
         };
@@ -375,7 +284,7 @@ impl GfxInternal {
         let buffer_slice = buffer.slice(..);
 
         buffer_slice.map_async(wgpu::MapMode::Read, |_| {});
-        device.poll(wgpu::Maintain::Wait);
+        self.device.poll(wgpu::Maintain::Wait);
         for chunk in buffer_slice
             .get_mapped_range()
             .chunks(*bytes_per_row as usize)
@@ -385,19 +294,43 @@ impl GfxInternal {
         writer.finish()?;
         Ok(())
     }
+
+    pub fn aspect_ratio(&self) -> f32 {
+        self.config.width as f32 / self.config.height as f32
+    }
+
+    pub fn window(&self) -> Option<&Window> {
+        let GfxBacking::Surface(GfxSurface { window, .. }) = &self.backing else {
+            return None;
+        };
+        Some(window)
+    }
+}
+
+pub enum GfxBacking {
+    Surface(GfxSurface),
+    Buffer(GfxBuffer),
+}
+
+fn fullscreen_mode(fullscreen: bool) -> Option<Fullscreen> {
+    if fullscreen {
+        Some(Fullscreen::Borderless(None))
+    } else {
+        None
+    }
 }
 
 /// Wrapper that allows a surface or a buffer to be used
 pub enum RenderableTexture {
     Surface(wgpu::SurfaceTexture),
-    Texture(&'static wgpu::Texture),
+    Texture(Arc<wgpu::Texture>),
 }
 
 impl RenderableTexture {
     pub fn texture(&self) -> &wgpu::Texture {
         match self {
             Self::Surface(surface) => &surface.texture,
-            Self::Texture(texture) => texture,
+            Self::Texture(texture) => texture.as_ref(),
         }
     }
 

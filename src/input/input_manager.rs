@@ -11,7 +11,7 @@ pub struct InputManagerState<B: InputBind> {
     pub mouse_sensitivity: [f64; 2],
     /// Input bindings
     pub bindings: Bindings<B>,
-    /// The current time elapsed since the start of the event loop scaled by the time_scale.
+    /// The current time elapsed since the start of the event loop scaled by the `time_scale`.
     pub time: Duration,
     /// The time scale controls how fast time runs. A value of 1.0 is normal. A value of < 1.0 is slower than normal and > 1.0 is faster than normal.
     pub time_scale: f32,
@@ -77,19 +77,19 @@ impl<B: InputBind> InputManagerState<B> {
         )
     }
 
-    /// Returns the time between the last update and the update before it taking into account the time_scale.
+    /// Returns the time between the last update and the update before it taking into account the `time_scale`.
     pub fn delta_time(&self) -> Duration {
         self.raw.delta_time().mul_f32(self.time_scale)
     }
 
-    /// Returns the time between the last update and the update before it taking into account the time_scale as an f32.
+    /// Returns the time between the last update and the update before it taking into account the `time_scale` as an f32.
     ///
     /// Equivalent to [`Self::delta_time`] followed by [`Duration::as_secs_f32`]
     pub fn delta_time_f32(&self) -> f32 {
         self.delta_time().as_secs_f32()
     }
 
-    /// Returns the time between the last update and the update before it taking into account the time_scale as an f64.
+    /// Returns the time between the last update and the update before it taking into account the `time_scale` as an f64.
     ///
     /// Equivalent to [`Self::delta_time`] followed by [`Duration::as_secs_f64`]
     pub fn delta_time_f64(&self) -> f64 {
@@ -97,6 +97,7 @@ impl<B: InputBind> InputManagerState<B> {
     }
 
     /// Get the 1-D axis
+    #[expect(clippy::needless_pass_by_value)]
     pub fn axis(&self, bind: AxisBind<B>) -> f32 {
         (if self.held(bind.pos) { 1.0 } else { 0.0 })
             - (if self.held(bind.neg) { 1.0 } else { 0.0 })

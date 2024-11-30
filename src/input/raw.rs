@@ -38,7 +38,7 @@ pub struct RawInputManagerState {
 
 impl<H: RawInputHandler> ApplicationHandler for RawInputManager<H> {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        self.handler.resumed(event_loop)
+        self.handler.resumed(event_loop);
     }
 
     fn window_event(
