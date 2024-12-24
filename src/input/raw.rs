@@ -161,12 +161,14 @@ impl RawInputManagerState {
     fn update_input(&mut self, input: Input, state: ElementState) {
         match state {
             ElementState::Pressed => {
-                self.keys_held.insert(input);
-                self.keys_pressed.insert(input);
+                if self.keys_held.insert(input) {
+                    self.keys_pressed.insert(input);
+                }
             }
             ElementState::Released => {
-                self.keys_held.remove(&input);
-                self.keys_released.insert(input);
+                if self.keys_held.remove(&input) {
+                    self.keys_released.insert(input);
+                }
             }
         }
     }
