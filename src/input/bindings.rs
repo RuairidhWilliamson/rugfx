@@ -53,6 +53,14 @@ impl<B: InputBind> Bindings<B> {
     pub fn transform(&self, input: &B) -> &[Input] {
         self.key_map.get(input).map_or(&[], Vec::as_slice)
     }
+
+    /// Merges two sets of key bindings together, in a non-destructive way
+    pub fn merge(&mut self, other: Self) {
+        for (input, list) in other.key_map {
+            let v = self.key_map.entry(input).or_default();
+            v.extend(list);
+        }
+    }
 }
 
 /// An axis binding that combines two [`Bindings`] two form a 1 dimensional axis
@@ -94,7 +102,7 @@ pub struct AxisBind<'a, B: InputBind> {
 macro_rules! dry_binds {
     ($($key:expr => $bind:expr),* $(,)?) => {{
         let mut binds = rugfx::input::bindings::Bindings::default();
-        $(binds.bind($key.into(), $bind));*;
+        $(binds.bind($key.into(), $bind.into()));*;
         binds
     }}
 }
