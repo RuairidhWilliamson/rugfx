@@ -100,11 +100,8 @@ impl Gfx {
     }
 
     fn create_instance() -> wgpu::Instance {
-        wgpu::Instance::new(wgpu::InstanceDescriptor {
+        wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: Backends::VULKAN | Backends::METAL | Backends::DX12 | Backends::GL,
-            // This can be swapped out for a faster and more modern compiler which requires extra
-            // dlls to be shipped https://docs.rs/wgpu/latest/wgpu/enum.Dx12Compiler.html
-            dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
             ..Default::default()
         })
     }
@@ -237,9 +234,9 @@ impl Gfx {
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
                 encoder.copy_texture_to_buffer(
                     buffer.texture.as_image_copy(),
-                    wgpu::ImageCopyBuffer {
+                    wgpu::TexelCopyBufferInfo {
                         buffer: &buffer.buffer,
-                        layout: wgpu::ImageDataLayout {
+                        layout: wgpu::TexelCopyBufferLayout {
                             offset: 0,
                             bytes_per_row: Some(buffer.bytes_per_row),
                             rows_per_image: None,
